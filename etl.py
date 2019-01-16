@@ -1,6 +1,20 @@
-import os,ogr,json,pgsql
-INPUT_DIR = 'D:\gis_data\DKP'
+import os,ogr,json,pgsql,datetime,argparse
+ap = argparse.ArgumentParser()
+ap.add_argument("-input",required=False,dest="input",help="D:\gis_data\DKP\KOPRIVNICA")
+args = vars(ap.parse_args())
+if args['input']:
+    INPUT_DIR = args['input']
+else:
+    INPUT_DIR = 'D:\gis_data\DKP'
+
+print(INPUT_DIR)
+INSERTED=0
+WASTHERE=0
+UPDATE=0
+DELETED=0
 connection = pgsql.PGSql()
+start = datetime.datetime.now()
+print("*** ETL PROCESS START ***")
 for root, dirs, files in os.walk(INPUT_DIR, topdown = False):
    for name in files:
         if name.endswith('_3010.shp'):
@@ -23,7 +37,7 @@ for root, dirs, files in os.walk(INPUT_DIR, topdown = False):
                geom = dictData['geometry']
                geom['crs'] = {"type":"name","properties":{"name":"EPSG:"+EPSG}}
                data = dictData['properties']
-               sql = "SELECT id FROM dkp_zgrada WHERE id='%s'" % id
+               sql = "SELECT oid FROM dkp_zgrada WHERE id='%s'" % id
                connection.connect()
                objExists = connection.query(sql, False)
                connection.close()
@@ -35,10 +49,12 @@ for root, dirs, files in os.walk(INPUT_DIR, topdown = False):
                    insObj = connection.query(sql, False)
                    connection.close()
                    if insObj:
-                       print("SUCESSS: Object has been inserted into database with oid '%s'" % insObj[0][0])
+                       INSERTED = INSERTED + 1
+                       print("SUCESSS: Object id '%s' has been inserted into database with oid '%s'" % (id,insObj[0][0]))
                    else:
                        print("ERROR: Something went wrong with insertion of object id '%s'" % id)
                else:
+                   WASTHERE = WASTHERE + 1
                    print("INFO: Object id '%s' is already in database with oid '%s'. Checking the content. TBD" % (id,objExists[0][0]))
-           break
-
+end = datetime.datetime.now()
+print("*** ETL PROCESS FINISHED IN '%s' WITH STATS: INSERTED '%s' WAS THERE '%s' ***" % ((end-start),INSERTED,WASTHERE))
